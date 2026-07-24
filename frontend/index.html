@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Page Pulse | Website Auditor</title>
+  <style>
+    :root {
+      --bg: #0f172a;
+      --card-bg: #1e293b;
+      --accent: #38bdf8;
+      --text: #f8fafc;
+      --text-sub: #94a3b8;
+      --error: #f87171;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: system-ui, -apple-system, sans-serif; }
+    body { background-color: var(--bg); color: var(--text); padding: 2rem 1rem; display: flex; justify-content: center; }
+    .container { max-width: 700px; width: 100%; }
+    header { text-align: center; margin-bottom: 2rem; }
+    h1 { font-size: 2.2rem; color: var(--accent); margin-bottom: 0.5rem; }
+    p { color: var(--text-sub); }
+    
+    .search-box { display: flex; gap: 0.5rem; margin-bottom: 2rem; }
+    input[type="text"] {
+      flex: 1; padding: 0.8rem 1rem; border-radius: 8px; border: 1px solid #334155;
+      background: var(--card-bg); color: var(--text); font-size: 1rem; outline: none;
+    }
+    input[type="text"]:focus { border-color: var(--accent); }
+    button {
+      padding: 0.8rem 1.5rem; border-radius: 8px; border: none; background: var(--accent);
+      color: #000; font-weight: bold; cursor: pointer; transition: opacity 0.2s;
+    }
+    button:hover { opacity: 0.9; }
+    button:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    .error-card {
+      background: rgba(248, 113, 113, 0.1); border: 1px solid var(--error);
+      color: var(--error); padding: 1rem; border-radius: 8px; margin-bottom: 1rem; display: none;
+    }
+
+    .report-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; display: none; }
+    .card { background: var(--card-bg); padding: 1.2rem; border-radius: 8px; border: 1px solid #334155; }
+    .card.full-width { grid-column: 1 / -1; }
+    .card label { display: block; font-size: 0.85rem; color: var(--text-sub); margin-bottom: 0.3rem; }
+    .card .value { font-size: 1.1rem; font-weight: 600; word-break: break-word; }
+    
+    .spinner {
+      display: none; text-align: center; margin: 2rem 0; color: var(--accent);
+    }
+  </style>
+</head>
+<body>
+
+  <div class="container">
+    <header>
+      <h1>⚡ Page Pulse</h1>
+      <p>Instant SEO & Performance Web Auditor</p>
+    </header>
+
+    <div class="search-box">
+      <input type="text" id="urlInput" placeholder="Enter website URL (e.g., example.com)" />
+      <button id="auditBtn" onclick="runAudit()">Audit</button>
+    </div>
+
+    <div id="loading" class="spinner">Analyzing webpage... Please wait.</div>
+    <div id="error" class="error-card"></div>
+
+    <div id="report" class="report-grid">
+      <div class="card full-width">
+        <label>Page Title</label>
+        <div class="value" id="resTitle">-</div>
+      </div>
+      <div class="card full-width">
+        <label>Meta Description</label>
+        <div class="value" id="resMeta">-</div>
+      </div>
+      <div class="card">
+        <label>HTTP Status</label>
+        <div class="value" id="resStatus">-</div>
+      </div>
+      <div class="card">
+        <label>Response Time</label>
+        <div class="value" id="resTime">-</div>
+      </div>
+      <div class="card">
+        <label>H1 Headers Count</label>
+        <div class="value" id="resH1">-</div>
+      </div>
+      <div class="card">
+        <label>Images Missing Alt Text</label>
+        <div class="value" id="resAlt">-</div>
+      </div>
+      <div class="card full-width">
+        <label>Approx. Word Count</label>
+        <div class="value" id="resWords">-</div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // UPDATE THIS URL AFTER DEPLOYING BACKEND (e.g., https://page-pulse-api.onrender.com/api/audit)
+    const API_URL = 'http://localhost:5000/api/audit';
+
+    async function runAudit() {
+      const urlInput = document.getElementById('urlInput').value.trim();
+      const errorDiv = document.getElementById('error');
+      const reportDiv = document.getElementById('report');
+      const loadingDiv = document.getElementById('loading');
+      const btn = document.getElementById('auditBtn');
+
+      // Reset state
+      errorDiv.style.display = 'none';
+      reportDiv.style.display = 'none';
+      
+      if (!urlInput) {
+        showError('Please enter a valid URL.');
+        return;
+      }
+
+      loadingDiv.style.display = 'block';
+      btn.disabled = true;
+
+      try {
+        const response = await fetch(API_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ url: urlInput })
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          throw new Error(data.error || 'Failed to analyze page.');
+        }
+
+        // Render Results
+        document.getElementById('resTitle').innerText = data.pageTitle;
+        document.getElementById('resMeta').innerText = data.metaDescription;
+        document.getElementById('resStatus').innerText = `${data.status} OK`;
+        document.getElementById('resTime').innerText = `${data.responseTimeMs} ms`;
+        document.getElementById('resH1').innerText = data.h1Count;
+        document.getElementById('resAlt').innerText = data.imagesMissingAlt;
+        document.getElementById('resWords').innerText = `~${data.wordCount} words`;
+
+        reportDiv.style.display = 'grid';
+
+      } catch (err) {
+        showError(err.message);
+      } finally {
+        loadingDiv.style.display = 'none';
+        btn.disabled = false;
+      }
+    }
+
+    function showError(msg) {
+      const errorDiv = document.getElementById('error');
+      errorDiv.innerText = msg;
+      errorDiv.style.display = 'block';
+    }
+  </script>
+</body>
+</html>
